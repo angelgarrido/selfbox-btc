@@ -1,0 +1,42 @@
+<html lang="en">
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+	<title>Selfbox</title>
+	<meta name="author" content="Selfbox">
+	<meta name="description" content="Blabla">
+	<meta name="keywords" content="Bla bla">
+	<link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
+	<meta name="viewport" content="width=device-width,initial-scale=1.0">
+	<!-- format scss -->
+	<link rel="stylesheet" href="css/bootstrap.css">
+	<link rel="stylesheet" href="css/style.css">
+	<!-- webfont google -->
+
+	
+</head>
+
+<body class="landing">
+<div class="col-lg-12 col-md-12 col-sm-12 col-xs-12 claim"  >
+	<h1 ><span style="color:orange;">self</span><span style="color:white;">box</span></h1>
+	<h2>imagine a descentralized banking system<h2>
+	</div>
+	<div>
+	<button class="btn-lg btn-default col-lg-offset-5 col-md-offset-5 col-sm-offset-5 col-xs-offset-5 " type="submit" onclick="proceed();">Login with your bank account</button>
+	</div>
+<script src="js/bootstrap.js"></script>
+<script type="text/javascript">
+
+	function proceed () {
+    var form = document.createElement('form');
+    form.setAttribute('method', 'post');
+    form.setAttribute('action', 'http://google.com');
+    form.style.display = 'hidden';
+    document.body.appendChild(form)
+    form.submit();
+}
+
+
+</script>
+
+</body>
+</html>
