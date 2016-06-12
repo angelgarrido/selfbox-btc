@@ -1,129 +1,223 @@
-// requires
-var fs = require ('fs');
-var prompt = require('prompt');
-var erisC = require('eris-contracts');
-var formidable= require ('formidable');
+// Open Bank Project
+
+// Copyright 2011,2014 TESOBE / Music Pictures Ltd.
+//
+// Usuario a) Actor principal, ejecuta los casos de uso
+//
+//
+// Usuario b) Cuenta de exchange, TODO: Modificar  
+
+//  email: alberto.garcia.gutierrez.x.x@example.com",
+//  account_id: 31b3a179-eadb-4c3e-8f6d-3ada84d4ba15
+//	password: f37a72
+//
+//
+//
+
+var express = require('express');
+var session = require('express-session')
+var util = require('util');
+var oauth = require('oauth');
+var bodyParser= require('body-parser');
+var crypto_balance=0;
 var http = require('http');
-var util= require('util');
-var crypto= require('crypto');
+var fs = require('fs');
+var index2 = fs.readFileSync('front/user2.html');
 
-// Configure our HTTP server to respond with Hello World to all requests.
-var server = http.createServer(function (req, res) {
-    if (req.method.toLowerCase() == 'get') {
-        displayForm(res);
-    } else if (req.method.toLowerCase() == 'post') {
-        //processAllFieldsOfTheForm(req, res);
-        processFormFieldsIndividual(req, res);
+
+var app = express();
+app.set('views', __dirname + '/front');
+app.engine('html', require('ejs').renderFile);
+app.set('view engine', 'ejs');
+
+// To get the values for the following fields, please register your client here:
+// https://apisandbox.openbankproject.com/consumer-registration
+var _openbankConsumerKey = "5otsgo1lj1yry3f0zxbiu0gevhhigakgfvcw3wcl";
+var _openbankConsumerSecret = "ph0az44esbxt3ooxy1o2exrxk5ghcpxfn2frzrs0";
+var base_url = "https://apisandbox.openbankproject.com";
+
+var consumer = new oauth.OAuth(
+  base_url + '/oauth/initiate',
+  base_url + '/oauth/token',
+  _openbankConsumerKey,
+  _openbankConsumerSecret,
+  '1.0',                             //rfc oauth 1.0, includes 1.0a
+  'http://127.0.0.1:8080/callback',
+  'HMAC-SHA1');
+
+var cookieParser = require('cookie-parser');
+app.use(session({
+  secret: "very secret",
+  resave: false,
+  saveUninitialized: true
+}));
+
+var api_base_url;
+
+
+app.get('/connect', function(req, res){
+  consumer.getOAuthRequestToken(function(error, oauthToken, oauthTokenSecret, results){
+    if (error) {
+      res.status(500).send("Error getting OAuth request token : " + util.inspect(error));
+    } else {
+      req.session.oauthRequestToken = oauthToken;
+      req.session.oauthRequestTokenSecret = oauthTokenSecret;
+      res.redirect(base_url + "/oauth/authorize?oauth_token="+req.session.oauthRequestToken);
     }
-});
-
-// Listen on port 8000, IP defaults to 127.0.0.1
-server.listen(8000);
-
-// Put a friendly message on the terminal
-console.log("Server running at http://127.0.0.1:8000/");
-
-// NOTE. On Windows/OSX do not use localhost. find the
-// url of your chain with:
-// docker-machine ls
-// and find the docker machine name you are using (usually default or eris).
-// for example, if the URL returned by docker-machine is tcp://192.168.99.100:2376
-// then your erisdbURL should be http://192.168.99.100:1337/rpc
-var erisdbURL = "http://localhost:1337/rpc";
-
-// get the abi and deployed data squared away
-var contractData = require('./epm.json');
-var idisContractAddress = contractData["deployCompanies"];
-var idisAbi = JSON.parse(fs.readFileSync("./abi/" + idisContractAddress));
-
-// properly instantiate the contract objects manager using the erisdb URL
-// and the account data (which is a temporary hack)
-var accountData = require('./accounts.json');
-var contractsManager = erisC.newContractManagerDev(erisdbURL, accountData.simplechain_full_000);
-
-// properly instantiate the contract objects using the abi and address
-var idisContract = contractsManager.newContractFactory(idisAbi).at(idisContractAddress);
-
-// display the current value of idi's contract by calling
-// the `get` function of idi's contract
-function getValue(callback) {
-  idisContract.get(function(error, result){
-    if (error) { throw error }
-    console.log("Idi's number is:\t\t\t" + result.toNumber());
-    callback();
   });
-}
-
-
-// Handles the image upload
-
-
-function processFormFieldsIndividual(req, res) {
-    //Store the data from the fields in your data store.
-    //The data store could be a file or database or any other store based
-    //on your application.
-    var fields = [];
-    var form = new formidable.IncomingForm();
-    //Call back when each field in the form is parsed.
-    form.on('field', function (field, value) {
-        console.log(field);
-        console.log(value);
-        fields[field] = value;
-    });
-    //Call back when each file in the form is parsed.
-    form.on('file', function (name, file) {
-        console.log(name);
-        console.log(file);
-        fields[name] = file;
-        //Storing the files meta in fields array.
-        //Depending on the application you can process it accordingly.
-    });
-
-    //Call back for file upload progress.
-    form.on('fileBegin', function (name, file){
-        file.path = __dirname + '/uploads/' + file.name;
-    });
-
-    form.on('file', function (name, file){
-        
-	console.log('Uploaded ' + file.name + getDocumentHash(file.path));
-    });
-
-    
-
-    //Call back at the end of the form.
-    form.on('end', function () {
-        res.writeHead(200, {
-            'content-type': 'text/plain'
-        });
-        res.write('received the data:\n\n');
-        res.end(util.inspect({
-            fields: fields
-        }));
-    });
-    form.parse(req);
-}
-function displayForm(res) {
-    fs.readFile('res/form.html', function (err, data) {
-        res.writeHead(200, {
-            'Content-Type': 'text/html',
-                'Content-Length': data.length
-        });
-        res.write(data);
-    });
-}
-
-function getDocumentHash(file_path){
-
-  // change the algo to sha1, sha256 etc according to your requirements
-  var algo = 'sha256';
-  var shasum = crypto.createHash(algo);
-  var file = file_path;
-  var s = fs.ReadStream(file);
-  s.on('data', function(d) { shasum.update(d); });
-  s.on('end', function() {
-  var d = shasum.digest('hex');
-  console.log(d);
 });
 
+
+
+app.get('/callback', function(req, res){
+  consumer.getOAuthAccessToken(
+    req.session.oauthRequestToken,
+    req.session.oauthRequestTokenSecret,
+    req.query.oauth_verifier,
+    function(error, oauthAccessToken, oauthAccessTokenSecret, result) {
+      if (error) { 	
+        //oauthAccessToken, -Secret and result are now undefined
+        res.status(500).send("Error getting OAuth access token : " + util.inspect(error));
+      } else {
+        //error is now undefined
+        req.session.oauthAccessToken = oauthAccessToken;
+        req.session.oauthAccessTokenSecret = oauthAccessTokenSecret;
+        res.redirect('/signed_in');
+      }
+    }
+  );
+});
+
+
+app.get('/signed_in', function(req, res){
+  res.status(200).send('Signing in by OAuth worked.' 
+ + 	'Acciones disponibles: <br><a href="/getAllTransactions">'
+ +'Ver listado de transacciones</a>  <br>'
+ +'<a href="/getBalance">Ver balance</a> <br>'
+ +'<a href="/makeTransaction"> Hacer Transacción </a>')
+});
+
+
+app.get('/getAllTransactions', function(req, res){
+  
+  consumer.get("https://apisandbox.openbankproject.com/obp/v1.2.1/banks/at03-bank-x/accounts/9da72b02-5a6e-45e8-8cfe-daa23412ebb5/owner/transactions",
+  req.session.oauthAccessToken,
+  req.session.oauthAccessTokenSecret,
+  function (error, data, response) {
+
+      var parsedData = JSON.parse(data);
+      res.status(200).send(parsedData);
+      //res.write(data);
+  });
+});
+
+app.get('/getBalance', function(req, res){
+  
+  consumer.get("https://apisandbox.openbankproject.com/obp/v1.2.1/banks/at03-bank-x/accounts/9da72b02-5a6e-45e8-8cfe-daa23412ebb5/owner/transactions",
+  req.session.oauthAccessToken,
+  req.session.oauthAccessTokenSecret,
+  function (error, data, response) {
+
+      var parsedData = JSON.parse(data);
+      var balance_json= get_balance(parsedData);	
+      res.status(200).send(balance_json);
+      //res.write(data);
+  });
+});
+
+
+
+app.get('/makeTransaction', function(req, res){
+  
+
+  // exports.OAuth.prototype.post= function(url, oauth_token, oauth_token_secret, post_body, post_content_type, callback) {
+  var post_params = {};
+  post_params.bank_id= 'at03-bank-x';
+  post_params.account_id= '31b3a179-eadb-4c3e-8f6d-3ada84d4ba15';
+  post_params.amount='12.45';
+
+  console.log(post_params);
+
+
+
+  consumer.post("https://apisandbox.openbankproject.com/obp/v1.2.1/banks/at03-bank-x/accounts/9da72b02-5a6e-45e8-8cfe-daa23412ebb5/owner/transactions",
+  req.session.oauthAccessToken,
+  req.session.oauthAccessTokenSecret,
+  JSON.stringify(post_params),
+  'application/json',						
+  function (error, data, response) {
+
+      //var parsedData = JSON.parse(data);
+      //res.write(data);
+      //var balance_json= get_balance(parsedData);	
+      crypto_balance += 9.85* 12.45;
+      res.status(200).send(data);
+      //res.write(data);
+  });
+});
+
+
+app.get('/accounts', function(req, res){
+  consumer.get("https://apisandbox.openbankproject.com/obp/v1.2.1/getBanks",
+  req.session.oauthAccessToken,
+  req.session.oauthAccessTokenSecret,
+  function (error, data, response) {
+      
+
+
+      //var parsedData = JSON.parse(data);
+      //res.status(200).send(data)
+      //res.write(data);
+  });
+});
+
+
+
+
+app.get('/getBanks', function(req, res){
+  consumer.get("https://apisandbox.openbankproject.com/obp/v1.2.1/banks",
+  req.session.oauthAccessToken,
+  req.session.oauthAccessTokenSecret,
+  function (error, data, response) {
+      var parsedData = JSON.parse(data);
+      res.status(200).send(parsedData)
+  });
+});
+
+
+
+app.get('/user', function(req, res){ 
+      res.render('user2.html');  
+});
+
+
+
+app.get('*', function(req, res){
+  res.redirect('/connect');
+});
+
+
+
+
+function get_balance(transactions_log){
+
+	total_balances= {} 
+	fiat_balance=transactions_log.transactions[0].details.new_balance;
+	total_balances.fiat_balance=fiat_balance;
+	total_balances.crypto_balance= {}
+	total_balances.crypto_balance.eth=crypto_balance;
+	
+
+	return total_balances;
 }
+
+function get_transactions_log(transactions_log){
+
+
+}
+
+
+
+
+app.listen(8080);
+
